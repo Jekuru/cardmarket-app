@@ -21,11 +21,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::prefix('users')->group(function(){
-    Route::put('/register', [UsersController::class, 'register'])->middleware('check-user');
+    Route::put('/register', [UsersController::class, 'register']);
     Route::get('/login', [UsersController::class, 'login']);
     Route::post('/resetpassword', [UsersController::class, 'resetpassword']);
-    Route::get('/list', [UsersController::class, 'list'])->middleware('check-user');
-    Route::get('/view', [UsersController::class, 'view'])->middleware('check-user');
-    Route::get('/profile', [UsersController::class, 'profile']);
-    Route::post('/modify', [UsersController::class, 'modify'])->middleware('check-user');
+    // CRUD??
 });
+
+Route::prefix('cards')->group(function(){
+    Route::put('/register', [UsersController::class, 'register']);
+    // CRUD??
+})->middleware('check-admin');

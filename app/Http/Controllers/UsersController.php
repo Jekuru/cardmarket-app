@@ -26,13 +26,13 @@ class UsersController extends Controller
         // NUEVO USUARIO
         $user = new User();
 
-        $user->name = $data->name;
+        $user->user = $data->user;
         $user->email = $data->email;
         $user->password = $data->password;    
         $user->role = $data->role;
 
         // COMPROBAR ENUM
-        if($user->role == 'Particular' || $user->role == 'Professional' || $user->role == 'Administrator'){
+        if($user->role == 'Particular' || $user->role == 'Profesional' || $user->role == 'Administrador'){
             $checkRole = true;
         } else {
             $checkRole = false;
@@ -41,23 +41,31 @@ class UsersController extends Controller
         // COMPROBAR SI SE HA INTRODUCIDO UN EMAIL VALIDO
         $checkEmail = $this->CheckEmail($user->email);
 
-        // COMPROBAR SI LA CONTRASEÑA ES SEGURA
+        // COMPROBAR SI LA CONTRASEÑA ES SEGURA Y CIFRARLA
         $checkPassword = $this->CheckPassword($user->password);
+        if($checkPassword){
+            $originalPassword = $user->password;
+            $user->password = password_hash($user->password, PASSWORD_DEFAULT);            
+        }
 
-        // COMPROBAR SI EL USUARIO YA ESTÁ REGISTRADO
-        $exists = User::where('name', '=', $data->name)->first();
+        // COMPROBAR SI EL USUARIO Y EL CORREO YA ESTAN REGISTRADOS
+        $userExists = User::where('user', '=', $data->user)->first();
+        $emailExists = User::where('email', '=', $data->email)->first();
         
         try {
             if($checkRole){
                 if($checkEmail){
                     if($checkPassword){
-                        if($exists){
+                        if($userExists){
                             $msg['status'] = 0;
-                            $msg['msg'] = "No se pudo crear el usuario especificado, el usuario ".$user->name." ya existe.";
+                            $msg['msg'] = "No se pudo crear el usuario especificado, el usuario ".$user->user." ya existe.";
+                        } else if($emailExists){
+                            $msg['status'] = 0;
+                            $msg['msg'] = "No se pudo crear el usuario especificado, el correo ".$user->email." ya existe.";
                         } else {
                             $user->save();
                             $msg['status'] = 1;
-                            $msg['msg'] = "Usuario ".$user->name." registrado correctamente";
+                            $msg['msg'] = "Usuario ".$user->user." registrado correctamente";
                         }
                     } else {
                         $msg['status'] = 0;
@@ -84,12 +92,12 @@ class UsersController extends Controller
      * Genera un TOKEN
      */
     public function login(Request $req){
-        $response = ["status" => 1, "msg" => ""];
+        $response = ["status" => 0, "msg" => "Algo ha fallado en el inicio de sesión"];
 
-        if($req->has('email')){
-            $email = $req->input('email');
+        if($req->has('user')){
+            $user = $req->input('user');
         } else {
-            $email = "";
+            $user = "";
         }
         if($req->has('pswd')){
             $pswd = $req->input('pswd');
@@ -98,34 +106,31 @@ class UsersController extends Controller
         }
 
         try {
+            // Comprobar si existe el usuario (buscarlo en la BBDD)
             $checkEmail = DB::table('users')
-                            ->where('email', '=', $email)
+                            ->where('user', '=', $user)
                             ->first();
-            $checkPswd = DB::table('users')
-                            ->where('password', '=', $pswd)
-                            ->first();
-            $checkUser = DB::table('users')
-                            ->where('email', '=', $email)
-                            ->where('password', '=', $pswd)
-                            ->first();
-            if(!$checkEmail){
-                $response['status'] = 2;
-                $response['msg'] = "Introduce un email valido";
-            } else if(!$checkPswd || !$checkUser){
-                $response['status'] = 3;
+            if($checkEmail){ // Si existe, comprobar contraseña
+                $checkPswd = password_verify($pswd, $checkEmail->password);
+            }
+            if(!$checkEmail){ // Si no existe el usuario, imprimir mensaje...
+                $response['status'] = 0;
+                $response['msg'] = "Usuario no encontrado";
+            } else if(!$checkPswd){ // Si la contraseña es incorrecta, imprimir mensaje...
+                $response['status'] = 0;
                 $response['msg'] = "Contraseña incorrecta";  
-            } else if ($checkUser){
-                $user = User::find($checkUser->id);
+            } else if ($checkPswd){ // Si el usuario y contraseña son correctos, generar TOKEN de usuario
+                $user = User::find($checkEmail->id);
                 $user->api_token = Str::random(60);
                 $user->save();
-                
+                // Mensaje de login con exito
+                $response['status'] = 1;
                 $response['msg'] = "Usuario logeado";
                 $response['query'] = DB::table('users')
-                            ->where('id', '=', $checkUser->id)
+                            ->where('id', '=', $checkEmail->id)
                             ->select('email', 'api_token')
                             ->get();
             }
-
         }catch(\Exception $e){
             $response['msg'] = $e->getMessage();
             $response['status'] = 0;
@@ -140,7 +145,7 @@ class UsersController extends Controller
      * Requiere introducir un email, genera una contraseña aleatoria y la envía por correo electrónico
      */
     public function resetPassword(Request $req){
-        $response = ["status" => 1, "msg" => ""];
+        $response = ["status" => 0, "msg" => "Se ha producido un error al restablecer la contraseña."];
 
         if($req->has('email')){
             $email = $req->input('email');
@@ -149,255 +154,37 @@ class UsersController extends Controller
         }
 
         $user = User::where('email', $req->email)->first();
-        
+
         try{      
             if($user){
-                $user->password = Str::random(12);
+                $newPassword = $this->Random_str();
+                $user->password = password_hash($newPassword, PASSWORD_DEFAULT);
                 
-                // Enviar por email la nueva contraseña "temporal"
-                Mail::to($user->email)->send(new ResetPassword("Restablecer contraseña empleados-app",
+                /* Enviar por email la nueva contraseña, al no disponer de servicio de correo, imprimir por consola...
+                Mail::to($user->email)->send(new ResetPassword("Restablecer contraseña CardMarket-app",
                         "Nueva contraseña temporal", [
-                            "Hola, " .$user->name,
-                            "Tu nueva contraseña es: " .$user->password,
+                            "Hola, " .$user->user,
+                            "Tu nueva contraseña es: " .$newPassword,
                             "Al iniciar sesión nuevamente con esta contraseña se solicitará su cambio por una nueva.",
                             "Un saludo."
                         ]));
-                $user -> save();
-                $response["msg"] = "Se ha enviado una nueva contraseña temporal por email."; 
-                return response()->json($response);
-            } else {
-                $response["status"] = 2;
-                $response["msg"] = "No se ha encontrado el correo electronico introducido."; 
-                return response()->json($response);
-            }
-        }catch(\Exception $e){
-            $response['msg'] = $e->getMessage();
-            $response['status'] = 0;
-            $response['msg'] = "Se ha producido un error: ".$e->getMessage();
-        }
-    }
-
-    /**
-     * Listar todos los usuarios de la empresa
-     * Únicamente puden listar usuarios los directivos y RRHH, gestionado por Middlware "checkUserRole"
-     * Directivos ven a todos los usuarios excepto a otros directivos
-     * RRHH ven a todos los usuarios excepto los de RRHH y directivos
-     */
-    public function list(Request $req){
-        $response = ["status" => 1, "msg" => ""];
-
-        if($req->has('token')){
-            $token = $req->input('token');
-        } else {
-            $token = "";
-        }
-        
-        try {
-            $user = User::where('api_token', $req->token)->first();
-
-            if ($user->role == "directive"){
-                $query = DB::table('users')
-                            ->select('name', 'role', 'salary')
-                            ->whereIn('role', array('users', 'hr'))
-                            ->get();
-                $response["status"] = 2;
-            } else {
-                $query = DB::table('users')
-                            ->select('name', 'role', 'salary')
-                            ->where('role', '=', 'users')
-                            ->get();
-                $response["status"] = 3;                            
-            }
-            $response['msg'] = $query;
-        } catch(\Exception $e){
-            $response['msg'] = $e->getMessage();
-            $response['status'] = 0;
-            $response['msg'] = "Se ha producido un error: ".$e->getMessage();
-        }
-        return response()->json($response); 
-    }
-
-    /**
-     * Ver un perfil de un usuario de la empresa
-     * Lista nombre, email, puesto, biografía y salario.
-     * Únicamente pueden ver un perfil ajeno los usuarios directivos y de RRHH
-     * Los directivos ven todos los usuarios excepto a otros usuarios directivos.
-     * RRHH ve a todos los usuarios excepto a otros usuarios de RRHH y directivos.
-     * El usuario directivo o de RRHH puede ver su propio perfil
-     */
-    public function view(Request $req){
-        $response = ["status" => 1, "msg" => ""];
-
-        if($req->has('token')){
-            $token = $req->input('token');
-        } else {
-            $token = "";
-        }
-        if($req->has('profileId')){
-            $profileId = $req->input('profileId');
-        } else {
-            $profileId = "";
-        }
-        
-        try {
-            $user = User::where('api_token', $req->token)->first();
-            $profile = User::where('id', $profileId)->first();
-
-            if ($user->role == "directive"){
-                if($profile->role != "directive" || $profile->id == $user->id){
-                    $query = User::where('id', $profileId)
-                                    ->select('name', 'email', 'role', 'biography', 'salary')
-                                    ->first();
-                    $response['msg'] = $query;
-                } else {
-                    $response['status'] = 3;
-                    $response['msg'] = "Acceso denegado.";
-                }
-            } else {
-                if($profile->role != "hr" && $profile->role != "directive" || $profile->id == $user->id){
-                    $query = User::where('id', $profileId)
-                                    ->select('name', 'email', 'role', 'biography', 'salary')
-                                    ->first();
-                    $response['msg'] = $query;
-                } else {
-                    $response['status'] = 3;
-                    $response['msg'] = "Acceso denegado.";
-                }                        
-            }
-            
-        } catch(\Exception $e){
-            $response['msg'] = $e->getMessage();
-            $response['status'] = 0;
-            $response['msg'] = "Se ha producido un error: ".$e->getMessage();
-        }
-        return response()->json($response); 
-    }
-
-    /**
-     * Ver perfil propio
-     * Lista nombre, email, rol, salario y biografía.
-     * Es necesario haber iniciado sesión (tener un api_token activo).
-     */
-    public function profile(Request $req){
-        $response = ["status" => 1, "msg" => ""];
-
-        if($req->has('token')){
-            $token = $req->input('token');
-        } else {
-            $token = "";
-        }
-        
-        try {
-            $user = User::where('api_token', $req->token)->first();
-
-            if ($user->api_token){
-                $response['msg'] = DB::table('users')
-                            ->select('name', 'email', 'role', 'salary', 'biography')
-                            ->where('api_token', '=', $token)
-                            ->get();
-            } else {
-                $response['status'] = 3;
-                $response['msg'] = "Inicie sesion antes de utilizar esta funcion.";
-                echo "Hola";
-            }                        
-        } catch(\Exception $e){
-            $response['msg'] = $e->getMessage();
-            $response['status'] = 0;
-            $response['msg'] = "Se ha producido un error: ".$e->getMessage();
-        }
-
-        return response()->json($response); 
-    }
-
-    /**
-     * Modificar peril de usuario
-     * Se pueden modificar los campos: name, email, salary y biography
-     * Únicamente pueden modificar los usuarios directivos y de RRHH
-     * Estos usuarios pueden modificar su propio perfil
-     * Los usuarios directivos no pueden modificar otros usuarios directivos, pero sí pueden modificar a los usuarios de RRHH
-     * Los usuarios de RRHH no pueden modificar otros usuarios de RRHH ni usuarios directivos
-     * Requiere introducir el api_token del usuario que va a realizar la modificación y el ID de usuario que se va a modificar
-     */
-    public function modify(Request $req){
-        $response = ["status" => 1, "msg" => ""];
-
-        if($req->has('token')){
-            $token = $req->input('token');
-        } else {
-            $token = "";
-        }
-        if($req->has('user')){
-            $user = $req->input('user');
-        } else {
-            $user = "";
-        }
-        
-        // Buscar el usuario que va a realizar la modificación
-        $modifier = User::where('api_token', $token)->first();
-
-        // Buscar el usuario a modificar
-        $user = User::where('id', $req->user)->first();
-
-        $data = $req->getContent();
-        $data = json_decode($data);
-
-        try {
-            if(isset($user) && isset($modifier)){
+                */
                 
-                if (($modifier->role == "directive" && $user->role == "directive")
-                || ($modifier->role == "hr" && $user->role == "hr")
-                || ($modifier->role == "hr" && $user->role == "directive")){
-                    $permission = false;
-                    $response['status'] = 3;
-                    $response['msg'] = "Acceso denegado, no se pueden modificar usuarios con un rol superior o igual al tuyo.";
-                } else {
-                    $permission = true;
-                }
-                if($modifier->id == $user->id){
-                    $permission = true;
-                }
-                if($permission){
-                    if(isset($data->name)){
-                        $user->name = $data->name;
-                        $dataChanged = true;
-                     }
-
-                    if(isset($data->email)){
-                        $user->email = $data->email;
-                        $dataChanged = true;
-                    }
-
-                    if(isset($data->salary)){
-                        $user->salary = $data->salary;
-                        $dataChanged = true;
-                    }
-
-                    if(isset($data->biography)){
-                        $user->biography = $data->biography;
-                        $dataChanged = true;
-                    }
-
-                    if ($dataChanged){
-                        $user->save();
-                        $response['msg'] = "Usuario modificado correctamente";
-                    } else {
-                        $response["msg"] = "No se modificaron datos";
-                    }
-                }
-            } else if (!isset($modifier)){
-                $response['status'] = 2;
-                $response['msg'] = "Debes iniciar sesión para utilizar esta función.";
-            } else if (!isset($user)){
-                $response['status'] = 2;
-                $response['msg'] = "Introduce un usuario a modificar correcto.";
+                print("Nueva contraseña generada :" .$newPassword. "\n");
+                $user -> save();
+                $response["status"] = 1;
+                $response["msg"] = "Se ha enviado una nueva contraseña temporal por email."; 
+            } else {
+                $response["status"] = 0;
+                $response["msg"] = "No se ha encontrado el correo electronico introducido."; 
             }
+
+            return response()->json($response);
         }catch(\Exception $e){
             $response['msg'] = $e->getMessage();
             $response['status'] = 0;
             $response['msg'] = "Se ha producido un error: ".$e->getMessage();
         }
-
-        return response()->json($response); 
     }
 
     /**
@@ -424,5 +211,29 @@ class UsersController extends Controller
         } else {
             return false;
         }
+    }
+
+    /**
+     * Genera un string aleatorio, utilizando un generador de numeros
+     * pseudoaleatorios criptograficamente seguro (random_int)
+     * 
+     * @param int $length      Longitud de caracteres
+     * @param string $keyspace Un string con todos los posibles caracteres
+     *                         para seleccionar
+     * @return string
+     */
+    function Random_str(
+        int $length = 32,
+        string $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@%+!#$^?:.-_'
+        ): string {
+        if ($length < 1) {
+            throw new \RangeException("La longitud debe ser un número entero positivo");
+        }
+        $pieces = [];
+        $max = mb_strlen($keyspace, '8bit') - 1;
+        for ($i = 0; $i < $length; ++$i) {
+            $pieces []= $keyspace[random_int(0, $max)];
+        }
+        return implode('', $pieces);
     }
 }
