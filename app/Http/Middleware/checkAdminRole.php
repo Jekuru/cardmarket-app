@@ -30,14 +30,16 @@ class checkAdminRole
             if($token != ""){
                 $allow = DB::table('users')
                                 ->where('api_token', '=', $token)
-                                ->where('role', '=', 'Administrator')
+                                ->where('role', '=', 'Administrador')
                                 ->first();
+                
                 // SI ES ADMINISTRADOR SE CONCEDE ACCESO AL CONTROLADOR
                 if($allow){
                     $response["status"] = 1;
                     $response["msg"] = "Usuario administrador, acceso concedido.";
                     return $next($request);
                 } else {
+                    
                     $response["status"] = 0;
                     $response["msg"] = "Acceso denegado.";
                 }

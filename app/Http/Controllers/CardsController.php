@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-class CardController extends Controller
+use App\Models\Card;
+use App\Models\Collection;
+
+class CardsController extends Controller
 {
     //
     /**
@@ -19,11 +22,12 @@ class CardController extends Controller
         $data = json_decode($data);
        
         // NUEVA CARTA
-        $card = new User();
+        $card = new Card();
 
         try {
             // COMPROBAR SI LA CARTA YA HA SIDO REGISTRADA
             $cardExists = Card::where('name', '=', $data->name)->first();
+            
             if(!$cardExists){
                 $card->name = $data->name;
                 $card->description = $data->description;
