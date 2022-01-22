@@ -14,6 +14,7 @@ class Collection extends Model
      *
      * @var array<int, string>
      */
+    protected $primaryKey = "id";
     protected $fillable = [
         'name',
         'symbol',

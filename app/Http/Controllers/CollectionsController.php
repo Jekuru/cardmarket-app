@@ -26,10 +26,6 @@ class CollectionsController extends Controller
             // COMPROBAR SI LA COLECCION Y CARTA YA HAN SIDO REGISTRADAS
             $collectionExists = Collection::where('name', '=', $data->name)->first();
             $cardExists = Card::where('name', '=', $data->card_name)->first();
-
-                            
-            print_r("Here");
-            exit();
             
             if(!$collectionExists && !$cardExists){
                 // Asignar valores del JSON a la nueva colección
@@ -39,6 +35,7 @@ class CollectionsController extends Controller
                 // Asignar valores del JSON a la primera nueva carta de la colección
                 $card->name = $data->card_name;
                 $card->description = $data->card_description;
+                
             } if($collectionExists){
                 $msg['status'] = 0;
                 $msg['msg'] = "No se pudo dar de alta la coleccion especificada, la coleccion ".$data->name." ya existe.";
@@ -46,13 +43,13 @@ class CollectionsController extends Controller
                 $msg['status'] = 0;
                 $msg['msg'] = "No se pudo dar de alta la carta especificada, la carta ".$data->card_name." ya existe.";
             }
-            if(!$collectionExists && $cardExists){
+            if(!$collectionExists && !$cardExists){
                 $collection->save();
-                $registeredCollection = Collection::where('name', '=', $data->name);
+                $registeredCollection = Collection::where('name', '=', $collection->name)->first();
                 $card->collection_id = $registeredCollection->id;
                 $card->save();
                 $msg['status'] = 1;
-                $msg['msg'] = "Coleccion ".$collection->name." y carta " .$card->name. "registradas correctamente";
+                $msg['msg'] = "Coleccion ".$collection->name." y carta " .$card->name. " registradas correctamente";
             }
         } catch(\Exception $e){
             $msg['status'] = 0;
