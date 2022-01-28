@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 use App\Models\Collection;
 use App\Models\Card;
@@ -45,9 +46,15 @@ class CollectionsController extends Controller
             }
             if(!$collectionExists && !$cardExists){
                 $collection->save();
-                $registeredCollection = Collection::where('name', '=', $collection->name)->first();
-                $card->collection_id = $registeredCollection->id;
                 $card->save();
+                $registeredCollection = Collection::where('name', '=', $collection->name)->first();
+                $registeredCard = Card::where('name', '=', $card->name)->first();
+                DB::table('cards_collections')->insert([
+                    'card_id' => $card->id,
+                    'collection_id' => $collection->id,
+                    'created_at' => \Carbon\Carbon::now(),
+                    "updated_at" => \Carbon\Carbon::now()
+                ]);
                 $msg['status'] = 1;
                 $msg['msg'] = "Coleccion ".$collection->name." y carta " .$card->name. " registradas correctamente";
             }

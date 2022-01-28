@@ -27,20 +27,19 @@ Route::prefix('users')->group(function(){
     Route::put('/register', [UsersController::class, 'register']);
     Route::get('/login', [UsersController::class, 'login']);
     Route::post('/resetpassword', [UsersController::class, 'resetpassword']);
-    // NO HACE FALTA CRUD!!!
 });
 
 Route::prefix('cards')->group(function(){
     Route::put('/register', [CardsController::class, 'register'])->middleware('check-admin');
-    // NO HACE FALTA CRUD!!!
+    Route::put('/addCollection', [CardsController::class, 'addCollection'])->middleware('check-admin');
+    Route::get('/search', [CardsController::class, 'search'])->middleware('check-seller');
 });
 
 Route::prefix('collections')->group(function(){
     Route::put('/register', [CollectionsController::class, 'register'])->middleware('check-admin');
-    // NO HACE FALTA CRUD!!!
 });
 
 Route::prefix('cardssales')->group(function(){
     Route::put('/sell', [CardssalesController::class, 'sell'])->middleware('check-seller');
-
+    Route::get('/search', [CardssalesController::class, 'search']);
 });

@@ -17,12 +17,7 @@ class CreateCardsTable extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->string('description');
-            $table->unsignedBigInteger('collection_id');
             $table->timestamps();
-        });
-
-        Schema::table('cards', function(Blueprint $table){
-            $table->foreign('collection_id')->references('id')->on('collections');
         });
     }
     
