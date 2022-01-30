@@ -225,7 +225,7 @@ class UsersController extends Controller
      */
     function Random_str(
         int $length = 32,
-        string $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@%+!#$^?:.-_'
+        string $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@!?.-_'
         ): string {
         if ($length < 1) {
             throw new \RangeException("La longitud debe ser un número entero positivo");
