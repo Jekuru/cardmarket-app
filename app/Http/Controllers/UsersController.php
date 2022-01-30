@@ -171,6 +171,7 @@ class UsersController extends Controller
                 */
                 
                 print("Nueva contraseña generada :" .$newPassword. "\n");
+                $user->api_token = ""; // Eliminar token para cerrar sesion.
                 $user -> save();
                 $response["status"] = 1;
                 $response["msg"] = "Se ha enviado una nueva contraseña temporal por email."; 
