@@ -10,7 +10,7 @@ use App\Models\Card;
 
 class CollectionsController extends Controller
 {
-    //
+    // Registrar nueva coleccion
     public function register(Request $req){
 
         $msg = ["status" => 0, "msg" => "Algo ha fallado en el registro de la coleccion"];

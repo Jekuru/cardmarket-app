@@ -41,5 +41,5 @@ Route::prefix('collections')->group(function(){
 
 Route::prefix('cardssales')->group(function(){
     Route::put('/sell', [CardssalesController::class, 'sell'])->middleware('check-seller');
-    Route::get('/search', [CardssalesController::class, 'search']);
+    Route::get('/search', [CardssalesController::class, 'search'])->middleware('check-seller');
 });

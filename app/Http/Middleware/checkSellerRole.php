@@ -30,8 +30,7 @@ class checkSellerRole
             if($token != ""){
                 $allow = DB::table('users')
                                 ->where('api_token', '=', $token)
-                                ->where('role', '=', 'Particular')
-                                ->orWhere('role', '=', 'Profesional')
+                                ->whereIn('role', ["Particular", "Profesional"])
                                 ->first();
                 
                 // SI ES ADMINISTRADOR SE CONCEDE ACCESO AL CONTROLADOR

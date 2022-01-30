@@ -25,7 +25,7 @@ class CardssalesController extends Controller
             $token = "";
         }
         $seller = User::where('api_token', '=', $token)->first(); // VENDEDOR
-                
+           
         // JSON
         $data = $req->getContent();
         $data = json_decode($data);
@@ -35,7 +35,6 @@ class CardssalesController extends Controller
 
         $cardExists = Card::where('id', '=', $data->card_id)->first();
         
-
         try {            
             if($cardExists){
                 // Asignar valores del JSON a la nueva orden de venta.
@@ -48,7 +47,7 @@ class CardssalesController extends Controller
                 $msg['msg'] = "Orden de venta registrada correctamente";
             } else {
                 $msg['status'] = 0;
-                $msg['msg'] = "No se pudo dar de alta la carta especificada, la carta '".$data->name."' no existe en nuestra base de datos.";
+                $msg['msg'] = "No se pudo dar de alta la carta especificada, la carta con id '".$data->card_id."' no existe en nuestra base de datos.";
             }
         } catch(\Exception $e){
             $msg['status'] = 0;

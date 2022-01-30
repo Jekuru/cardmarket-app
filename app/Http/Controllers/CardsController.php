@@ -28,15 +28,12 @@ class CardsController extends Controller
         try {
             // COMPROBAR SI LA CARTA YA HA SIDO REGISTRADA
             $cardExists = Card::where('name', '=', $data->name)->first();
-            
             if(!$cardExists){
                 $card->name = $data->name;
                 $card->description = $data->description;
                 // COMPRUEBA QUE LA COLECCION EXISTE
-                $collectionExists = Collection::where('id', '=', $data->collection_id);
-                if($collectionExists)
-                    $card->collection_id = $data->collection_id;
-            } if($collectionExists){
+                $collectionExists = Collection::where('id', '=', $data->collection_id)->first();
+            } if(!$collectionExists){
                 $msg['status'] = 0;
                 $msg['msg'] = "No se pudo dar de alta la carta especificada, el ID de coleccion ".$data->collection_id." no existe.";
             } else {
@@ -45,6 +42,12 @@ class CardsController extends Controller
             }
             if(!$cardExists && $collectionExists){
                 $card->save();
+                DB::table('cards_collections')->insert([
+                    'card_id' => $card->id,
+                    'collection_id' => $collectionExists->id,
+                    'created_at' => \Carbon\Carbon::now(),
+                    "updated_at" => \Carbon\Carbon::now()
+                ]);
                 $msg['status'] = 1;
                 $msg['msg'] = "Carta ".$card->name." registrada correctamente";
             }
@@ -68,13 +71,25 @@ class CardsController extends Controller
         
         // Buscar la carta 
         $card = Card::where('id', $data->card_id)->first();
+        // Buscar la coleccion a la que se quiere añadir la carta
         $collection = Collection::where('id', $data->collection_id)->first();
 
+        if($card && $collection){
+            // Comprobar si la carta ya tiene esa coleccion asignada
+            $check = DB::table('cards_collections')
+                ->where('cards_collections.card_id', '=', $data->card_id)
+                ->where('cards_collections.collection_id', '=', $data->collection_id)
+                ->first();
+        }
+
         try {
-            if($card && $collection){
-                $card->id = $data->card_id;
-                $card->collection_id = $data->collection_id;
-                $card->save();
+            if($card && $collection && !$check){
+                DB::table('cards_collections')->insert([
+                    'card_id' => $card->id,
+                    'collection_id' => $collection->id,
+                    'created_at' => \Carbon\Carbon::now(),
+                    "updated_at" => \Carbon\Carbon::now()
+                ]);
                 $response['status'] = 1;
                 $response['msg'] = $card->name. " añadida a la coleccion " .$collection->name. " correctamente.";
             } else if (!$card && !$collection){
@@ -86,7 +101,10 @@ class CardsController extends Controller
             } else if (!$collection){
                 $response['status'] = 0;
                 $response['msg'] = "La coleccion introducida no existe.";
-            } 
+            } else if ($check){
+                $response['status'] = 0;
+                $response['msg'] = "La carta " .$card->name. " ya forma parte de la coleccion " .$collection->name. ".";
+            }
         }catch(\Exception $e){
             $response['msg'] = $e->getMessage();
             $response['status'] = 0;
@@ -110,22 +128,17 @@ class CardsController extends Controller
            
         // Se puede utilizar el parametro "filter" para buscar una carta concreta
         try {
-            $card = DB::table('cards')
-                        ->select('cards.name AS Nombre carta', 'cards.description AS Descripcion', 'cards.id AS ID carta')
+            $query = DB::table('cards')
+                        ->select('cards.name AS Nombre carta', 'cards.description AS Descripcion carta', 'cards.id AS ID carta', 'collections.name AS Nombre coleccion')
+                        ->leftJoin('cards_collections', 'cards_collections.card_id', '=', 'cards.id')
+                        ->leftJoin('collections', 'cards_collections.collection_id', '=', 'collections.id')
                         ->where('cards.name', 'LIKE', '%' .$filter. '%')
-                        ->get();
-                     
-            if($card){
-                $collection = DB::table('collections')
-                        ->select('collections.name AS Coleccion')
-                        ->leftJoin('cards_collections', 'collections.id', '=', 'cards_collections.collection_id')
                         ->get();
                 
                 $response["status"] = 1;
-                $response["msg"] = "Carta encontrada.";
-                $response["card"] = $card;
-                $response["collections"] = $collection;
-            }
+                $response["msg"] = "Busqueda finalizada";
+                $response["query"] = $query;
+                //$response["collections"] = $collection;
         } catch(\Exception $e){
             $response["status"] = 0;
             $response["msg"] = $e->getMessage();
